@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "axion": "^0.1.0",
+    "axios": "^1.13.1",
     "clsx": "^2.1.1",
     "modern-normalize": "^3.0.1",
     "react": "^19.1.1",
