@@ -1,5 +1,5 @@
 // src/components/App.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import Product from "./Product";
 import Alert from "./Alert";
@@ -7,8 +7,13 @@ import Button from "./Button";
 import UserMenu from "./UserMenu";
 import ClickCounter from "./ClickCounter";
 import OrderForm from "./OrderForm/OrderForm";
-import axios from "axios";
 import SearchForm from "./SearchForm/SearchForm";
+import ArticleList from "./ArticleList/ArticleList";
+import { Article } from "../types/article";
+// 1. Імпортуємо HTTP-функцію
+import { fetchArticles } from "../services/articleService";
+import Timer from "./Timer/Timer";
+import Modal from "./Modal/Modal";
 
 interface Values {
   x: number;
@@ -19,9 +24,6 @@ interface Article {
   objectID: string;
   title: string;
   url: string;
-}
-interface ArticlesHttpResponse {
-  hits: Article[];
 }
 
 export default function App() {
@@ -65,35 +67,96 @@ export default function App() {
     console.log("Order received from:", data);
   };
 
-  // 1. Оголошуємо і типізуємо стан
+  // Оголошуємо і типізуємо стан
   const [articles, setArticles] = useState<Article[]>([]);
 
+  // 1. Додаємо стан індикатора завантаження
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Оголошуємо стан
+  const [isError, setIsError] = useState(false);
+
   const handleSearch = async (topic: string) => {
-    const response = await axios.get<ArticlesHttpResponse>(
-      `https://hn.algolia.com/api/v1/search?query=${topic}`
-    );
-    // 2. Записуємо дані в стан після запиту
-    setArticles(response.data.hits);
+    // Додаємо блок try...catch
+    try {
+      // Змінюємо індикатор завантаження на true перед запитом
+      setIsLoading(true);
+      // Скидаємо стан помилки в false перед кожним запитом
+      setIsError(false);
+
+      // Використовуємо HTTP-функцію
+      const data = await fetchArticles(topic);
+      setArticles(data);
+
+      // const response = await axios.get<ArticlesHttpResponse>(
+      //   `https://hn.algolia.com/api/v1/search?query=${topic}`
+      // );
+      // 2. Записуємо дані в стан після запиту
+      // setArticles(response.data.hits);
+    } catch {
+      // Встановлюємо стан isError в true
+      setIsError(true);
+    } finally {
+      // Змінюємо індикатор на false після запиту
+      // після будь якого результату запиту
+      setIsLoading(false);
+    }
   };
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const openModal = () => setIsModalOpen(true);
+
+  const [clicked, setClicks] = useState(() => {
+    // Зчитуємо значення за ключем
+    const savedClicks = window.localStorage.getItem("saved-clicks");
+
+    // Якщо там щось є, повертаємо це
+    // значення як початкове значення стану
+    if (savedClicks !== null) {
+      return JSON.parse(savedClicks);
+    }
+
+    // У протилежному випадку повертаємо
+    // яке-небудь значення за замовчуванням
+    return 0;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("saved-clicks", JSON.stringify(clicked));
+  }, [clicked]);
 
   return (
     <>
+      <div>
+        <button onClick={() => setClicks(clicked + 1)}>
+          You clicked {clicked} times
+        </button>
+        <button onClick={() => setClicks(0)}>Reset</button>
+      </div>
+
+      <div>
+        <h1>Main content of the page</h1>
+        <button onClick={openModal}>Open modal</button>
+        {isModalOpen && (
+          <Modal onClose={closeModal}>
+            <h2>Modal Title</h2>
+            <p>This is some content inside the modal.</p>
+          </Modal>
+        )}
+      </div>
       <h1>Place your order</h1>
+      <Timer />
       <OrderForm onSubmit={handleOrder} />
 
       <SearchForm onSubmit={handleSearch} />
-      {articles.length > 0 && (
-        <ul>
-          {articles.map(({ objectID, url, title }) => (
-            <li key={objectID}>
-              <a href={url} target="_blank">
-                {title}
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
-      
+      {/* 4. Відображаєм повідомлення про завантаження даних в JSX */}
+      {isLoading && <p>Loading data, please wait...</p>}
+
+      {/* 6. Використовуємо стан isError щоб показати помилку */}
+      {isError && <p>Whoops, something went wrong! Please try again!</p>}
+      {articles.length > 0 && <ArticleList items={articles} />}
+
       <h1>Best selling</h1>
       <Product
         name="Tacos With Lime"
